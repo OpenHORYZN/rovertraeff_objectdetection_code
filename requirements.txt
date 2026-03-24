@@ -1,0 +1,11 @@
+ultralytics==8.3.0 
+opencv-python
+numpy
+pillow
+pyyaml
+tqdm
+
+label-studio
+label-studio-converter
+
+matplotlib

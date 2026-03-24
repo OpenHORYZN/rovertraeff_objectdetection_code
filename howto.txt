@@ -1,0 +1,8 @@
+Offline: (YOLO training and testing)
+0. Label Studio --> Transfer to YOLO)
+1. train, val, test split (Create YOLO Data Split): split size, random seed
+2. Yolo Model (v8/v11): epochs, batch size, image size, device (BallDetectionCam1 - Yolo11)
+3. Detect positions in all video frames
+4. Validate Detection Results (Check.py) ??? optional in config
+
+Online: ArUco + pose + mapping
