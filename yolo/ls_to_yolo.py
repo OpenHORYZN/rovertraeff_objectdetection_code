@@ -3,6 +3,7 @@ import random
 import shutil
 import sys
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs, unquote
 
 from PIL import Image
 
@@ -31,9 +32,17 @@ def class_map():
 
 def locate_image(task):
     raw_dir = config["paths"]["raw"]
-    rel = task.get("file_upload") or task["data"].get("image", "")
-    name = Path(rel).name
-    candidate = raw_dir / name
+    image_value = task["data"].get("image", "")
+
+    parsed = urlparse(image_value)
+    rel_path = parse_qs(parsed.query).get("d", [None])[0]
+
+    if not rel_path:
+        return None
+
+    rel_path = Path(unquote(rel_path))   # firsttest/WhatsApp Image ... .jpeg
+    candidate = raw_dir / rel_path       # data/raw/firsttest/WhatsApp Image ... .jpeg
+
     return candidate if candidate.exists() else None
 
 def convert_box(rect):
@@ -127,13 +136,13 @@ def write_data_yaml():
     names = config["yolo"]["classes"]
     name_lines = "\n".join(f"  {i}: {n}" for i, n in enumerate(names))
     txt = f"""path: {paths["yolo_root"]}
-        train: images/train
-        val: images/val
-        test: images/test
+train: images/train
+val: images/val
+test: images/test
 
-        names:
-        {name_lines}
-        """
+names:
+{name_lines}
+"""
     paths["data_yaml"].write_text(txt, encoding="utf-8")
 
 if __name__ == "__main__":

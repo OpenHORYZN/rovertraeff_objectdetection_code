@@ -7,12 +7,14 @@ config = {
     "paths": {
         "base": base_dir,
         "data": data_dir,
-        "raw": data_dir / "raw" / "firsttest",                     
-        "ls_export": data_dir / "labeled" / "Resultslabeling" / "LSTest" / "test- norotation-probeonly.json",
+        "raw": data_dir / "raw" ,                     
+        "ls_export": data_dir / "labeled" / "Resultslabeling" / "LSTest" / "test2-norotation-probeonly.json",
         "yolo_root": data_dir / "yolo",
         "images": data_dir / "yolo" / "images",
         "labels": data_dir / "yolo" / "labels",
         "data_yaml": data_dir / "yolo" / "dataset.yaml",
+        "runs": data_dir / "runs",
+        "vis": data_dir / "yolo" / "vis",
     },
     "splits": {
         "train": 0.7,
@@ -21,11 +23,11 @@ config = {
         "seed": 42,
     },
     "yolo": {
-        "model": "yolov8n.pt",  # yolo11s.pt
+        "model": "yolo11n.pt",  # yolo11s.pt
         "epochs": 50,
-        "batch": 8,
+        "batch": 4,
         "imgsz": 960,
-        "device": "cuda",       # cpu
+        "device": "cpu",       # cpu
         "classes": ["probe"], #, "rako_big", "rako_small"
     },
 }
