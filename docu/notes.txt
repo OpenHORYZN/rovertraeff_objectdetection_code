@@ -1,0 +1,26 @@
+Pipeline:
+- Camera node publishes image + camera info (/camera_info)
+- YOLO node uses your trained  best.pt  and detects probes/boxes in the image
+- Aruco node detects markers and estimates camera pose or marker pose
+	•	YOLO detections,
+	•	ArUco/world reference,
+	•	camera intrinsics, to compute object world positions
+
+To-Do:
+- train YOLO on better data (light, more objects in one, simple aruco inside image)
+- get aruco detection working
+- get live object detection working with yolo (photograph, label each object)
+- use known aruco world positions + camera intrinsics to estimate camera pose
+- convert object detection from image coordinates into world coordinates (Vicente)
+
+Questions:
+- Position determination only 2D or 3D with depth?
+- What if camera only sees object and no aruco marker?, fly high enough? input data?
+- each object only ones --> labeling
+- how much time do i need to detect images - flight, how good?
+
+Important: 
+- relative position from object to drone, to the starting position
+- pictures of objects
+- 12 min; 2-3 batteries
+- camera: Realsense Depth Camera D455
