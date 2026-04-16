@@ -9,8 +9,8 @@ from ultralytics import YOLO
 from config import config
 
 
-IOU_THRESH = 0.5
-CONF_THRESH = 0.02
+IOU_THRESH = config["validation"]["iou_threshold"]
+CONF_THRESH = config["validation"]["conf_threshold"]
 
 COLORS = {
     "gt": (0, 255, 255),   # yellow in BGR

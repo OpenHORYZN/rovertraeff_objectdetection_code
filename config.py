@@ -29,5 +29,16 @@ config = {
         "imgsz": 960,
         "device": "cpu",       # cpu
         "classes": ["probe"], #, "rako_big", "rako_small"
+        "confidence": 0.25,    # Detection confidence threshold
+    },
+    "camera": {
+        "model": "phone",
+        "device": "http://192.168.178.151:8080/video",  # IP Webcam URL
+        "resolution": [1920, 1080],
+        "fps": 30,
+    },
+    "validation": {
+        "iou_threshold": 0.5,       # For matching predictions to ground truth
+        "conf_threshold": 0.02,     # Low threshold to catch all detections in testing
     },
 }
