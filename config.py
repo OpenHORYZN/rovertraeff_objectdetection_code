@@ -24,18 +24,31 @@ config = {
     },
     "yolo": {
         "model": "yolo11n.pt",  # yolo11s.pt
+        "modellive": "data/runs/probe_yolo11_train/weights/best.pt",
+        "live_model": "yolo11n.pt",
         "epochs": 50,
         "batch": 4,
         "imgsz": 960,
+        "imgszlive": 640,
         "device": "cpu",       # cpu
         "classes": ["probe"], #, "rako_big", "rako_small"
-        "confidence": 0.25,    # Detection confidence threshold
+        "live_classes": ["mouse"], # for testing only, delete after
+        "confidence": 0.05,    # Detection confidence threshold
+        "live_confidence": 0.20,
     },
-    "camera": {
-        "model": "phone",
+    "aruco": {
+        "enabled": True,
+        "dictionary": "DICT_6X6_250", # which one?
+        "fallback_dictionaries": ["DICT_4X4_50", "DICT_5X5_50", "DICT_6X6_250"],
+        "marker_length": 0.15,
+        "reference_marker_id": 101,
+    },
+    "camera": { 
+        "model": "phone", # just for testing
         "device": "http://192.168.178.151:8080/video",  # IP Webcam URL
+        "tethering": "http://10.49.75.98:8080/video", # Tethered phone URL
         "resolution": [1920, 1080],
-        "fps": 30,
+        "fps": 30, 
     },
     "validation": {
         "iou_threshold": 0.5,       # For matching predictions to ground truth

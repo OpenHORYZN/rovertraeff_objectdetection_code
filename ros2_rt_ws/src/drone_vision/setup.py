@@ -8,10 +8,14 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/drone_vision']),
         ('share/drone_vision', ['package.xml']),
+        ('share/drone_vision/launch', ['launch/drone_vision.launch.py']),
     ],
     entry_points={
         'console_scripts': [
             'camera_node = drone_vision.camera_node:main',
+            'yolo_node = drone_vision.yolo_node:main',
+            'aruco_node = drone_vision.aruco_node:main',
+            'pose_estimator_node = drone_vision.pose_estimator_node:main',
         ],
     },
 )

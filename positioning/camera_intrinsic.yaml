@@ -42,31 +42,4 @@ notes: |
   3. Replace intrinsic_matrix values
   4. Test with aruco_node (should estimate pose within 5% error)
 
----
-# GoPro Hero 7 Camera Calibration (for testing before D455 arrives)
-# Reference: GoPro Hero 7 specifications + typical wide-angle camera calibration
-# Date: 2026-04-12
-# Status: Estimated defaults (will be refined with checkerboard calibration)
-
-gopro:
-  camera_model: "GoPro_Hero7"
-  resolution: [1920, 1440]  # 16:9 video resolution (typical USB streaming)
-  frame_rate: 30            # Hz - adjust based on USB bandwidth
-
-  # Wide-angle camera @ 1920x1440 resolution
-  # Based on GoPro Hero 7 ~173° FOV typical wide-angle camera models
-  intrinsic_matrix:
-    fx: 1480.0    # focal length x (pixels) - wide angle lens
-    fy: 1480.0    # focal length y (pixels)
-    cx: 960.0     # principal point x (image center, 1920/2)
-    cy: 720.0     # principal point y (image center, 1440/2)
-
-  # Distortion coefficients [k1, k2, p1, p2, k3]
-  # Wide-angle lenses have significant barrel distortion
-  distortion:
-    k1: -0.25     # radial distortion 1 (GoPro barrel distortion)
-    k2: 0.05      # radial distortion 2
-    p1: 0.0       # tangential distortion 1
-    p2: 0.0       # tangential distortion 2
-    k3: 0.0       # radial distortion 3
-
+  https://automaticaddison.com/how-to-perform-pose-estimation-using-an-aruco-marker/#Print_a_Chessboard
