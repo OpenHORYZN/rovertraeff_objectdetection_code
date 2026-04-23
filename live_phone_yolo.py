@@ -103,7 +103,7 @@ def main():
     aruco_cfg = config.get("aruco", {})
 
     camera_url = camera_cfg.get("tethering") or camera_cfg["device"]
-    model_cfg = yolo_cfg.get("live_model") or yolo_cfg["model"]
+    model_cfg = yolo_cfg.get("modellive")
     model_path = Path(__file__).parent / model_cfg
     confidence = float(yolo_cfg.get("live_confidence", yolo_cfg["confidence"]))
     imgsz = int(yolo_cfg.get("imgszlive", yolo_cfg.get("imgsz", 640)))
@@ -145,6 +145,10 @@ def main():
     print(f"Connecting to camera: {camera_url}")
     cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  camera_cfg["resolution"][0])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_cfg["resolution"][1])
+    cap.set(cv2.CAP_PROP_FPS,          camera_cfg["fps"])
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open camera stream: {camera_url}")
 

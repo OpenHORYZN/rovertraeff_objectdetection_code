@@ -26,14 +26,14 @@ class YOLONode(Node):
         
         # Load YOLO model
         yolo_cfg = config["yolo"]
-        model_path = yolo_cfg.get("modellive") or yolo_cfg["model"]
+        model_path = yolo_cfg.get("modellive")
         base_dir = Path(config["paths"]["base"])
         model_path = Path(model_path)
         if not model_path.is_absolute():
             model_path = base_dir / model_path
         confidence = yolo_cfg["confidence"]
         device = yolo_cfg["device"]
-        imgsz = int(yolo_cfg.get("imgszlive", yolo_cfg.get("imgsz", 640)))
+        imgsz = int(yolo_cfg.get("imgsz"))
         desired_classes = yolo_cfg.get("classes", [])
         
         self.get_logger().info(f"Loading YOLO: {model_path}")

@@ -44,7 +44,7 @@ class CameraNode(Node):
         else:
             with open(yaml_path) as f:
                 cam_data = yaml.safe_load(f)
-                cam_config = cam_data  # D455 is at root level
+                cam_config = cam_data  
 
             # Extract intrinsics and distortion
             intr = cam_config.get("intrinsic_matrix", {})

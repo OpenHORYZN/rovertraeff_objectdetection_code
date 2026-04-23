@@ -26,8 +26,8 @@ class ArucoNode(Node):
         camera_cfg = config['camera']
         aruco_cfg = config.get('aruco', {})
         self.marker_length = float(aruco_cfg.get('marker_length', 0.15))
-        self.dictionary_name = aruco_cfg.get('dictionary', 'DICT_6X6_250')
-        dictionary_id = getattr(cv2.aruco, self.dictionary_name, cv2.aruco.DICT_6X6_250)
+        self.dictionary_name = aruco_cfg.get('dictionary', 'DICT_5X5_250')
+        dictionary_id = getattr(cv2.aruco, self.dictionary_name, cv2.aruco.DICT_5X5_250)
         dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
         self.detector = cv2.aruco.ArucoDetector(dictionary, cv2.aruco.DetectorParameters())
 

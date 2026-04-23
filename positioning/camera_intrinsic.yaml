@@ -1,7 +1,5 @@
 # RealSense D455 Camera Calibration
 # Reference: https://dev.intelrealsense.com/docs/calibration-white-papers
-# Date: 2026-04-12
-# Status: Factory defaults (will be recalibrated with checkerboard once hardware available)
 
 # Camera model
 camera_model: "RealSense_D455"
@@ -9,37 +7,20 @@ resolution: [1280, 720]  # Color stream resolution (adjust if you change config)
 frame_rate: 30           # Hz
 
 # Intrinsic matrix [ fx  0  cx ]
-#                   [ 0  fy  cy ]
-#                   [ 0   0   1]
+#                  [ 0  fy  cy ]
+#                  [ 0   0   1 ]
 
 # Factory typical values (from Intel datasheet @ 1280x720 resolution)
 intrinsic_matrix:
-  fx: 624.0    # focal length x (pixels) - scaled from 640x480 baseline
-  fy: 624.0    # focal length y (pixels)
-  cx: 640.0    # principal point x (image center)
-  cy: 360.0    # principal point y (image center)
+  fx: 604.22668802    # focal length x (pixels) - scaled from 640x480 baseline
+  fy: 607.02140168    # focal length y (pixels)
+  cx: 653.39002234    # principal point x (image center)
+  cy: 415.75246292    # principal point y (image center)
 
 # Distortion coefficients [k1, k2, p1, p2, k3]
 distortion:
-  k1: -0.06    # radial distortion 1 (typical for D455)
-  k2: 0.02     # radial distortion 2
-  p1: 0.0      # tangential distortion 1
-  p2: 0.0      # tangential distortion 2
-  k3: 0.0      # radial distortion 3
-
-# Calibration notes
-notes: |
-  These are FACTORY DEFAULTS from Intel D455 specification.
-  Accuracy: ~85-90% (sufficient for simulation, recalibrate for production)
-  
-  Scaling rule:
-  - If using 640x480: fx/fy *= 0.5, cx/cy *= 0.5
-  - If using 1920x1080: fx/fy *= 1.5, cx/cy *= 1.5
-  
-  Recalibration procedure:
-  1. Capture 50+ checkerboard images at different angles
-  2. Run: python3 -m opencv_calibration --images ./calib_images/ --output calib.yaml
-  3. Replace intrinsic_matrix values
-  4. Test with aruco_node (should estimate pose within 5% error)
-
-  https://automaticaddison.com/how-to-perform-pose-estimation-using-an-aruco-marker/#Print_a_Chessboard
+  k1: -0.04394124    # radial distortion 1 (typical for D455)
+  k2: 0.03501399   # radial distortion 2
+  p1: 0.01298172   # tangential distortion 1
+  p2: 0.00684472   # tangential distortion 2
+  k3: -0.00835813   # radial distortion 3

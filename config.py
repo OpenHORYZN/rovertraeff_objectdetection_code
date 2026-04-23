@@ -25,21 +25,17 @@ config = {
     "yolo": {
         "model": "yolo11n.pt",  # yolo11s.pt
         "modellive": "data/runs/probe_yolo11_train/weights/best.pt",
-        "live_model": "yolo11n.pt",
+        "device": "cpu",
         "epochs": 50,
         "batch": 4,
-        "imgsz": 960,
-        "imgszlive": 640,
-        "device": "cpu",       # cpu
-        "classes": ["probe"], #, "rako_big", "rako_small"
-        "live_classes": ["mouse"], # for testing only, delete after
-        "confidence": 0.05,    # Detection confidence threshold
-        "live_confidence": 0.20,
+        "imgsz": 640, # phone: 640, d455: 960   
+        "classes": ["probe"], # "probe", "rako_big", "rako_small", testing: mouse
+        "confidence": 0.03,    # Detection confidence threshold, live: 0.20
     },
     "aruco": {
         "enabled": True,
-        "dictionary": "DICT_6X6_250", # which one?
-        "fallback_dictionaries": ["DICT_4X4_50", "DICT_5X5_50", "DICT_6X6_250"],
+        "dictionary": "DICT_5X5_250", # 250?
+        "fallback_dictionaries": ["DICT_5X5_50", "DICT_5X5_100", "DICT_5X5_250", "DICT_5X5_1000"],
         "marker_length": 0.15,
         "reference_marker_id": 101,
     },
