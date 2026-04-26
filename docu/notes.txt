@@ -8,15 +8,11 @@ Pipeline:
 
 To-Do:
 - train YOLO on better data (light, more objects in one, simple aruco inside image)
-- get aruco detection working
-- get live object detection working with yolo (photograph, label each object)
 - use known aruco world positions + camera intrinsics to estimate camera pose
 - convert object detection from image coordinates into world coordinates (Vicente)
 
 Questions:
-- Position determination only 2D or 3D with depth?
-- What if camera only sees object and no aruco marker?, fly high enough? input data?
-- each object only ones --> labeling
+- each object only ones
 - how much time do i need to detect images - flight, how good?
 
 Important: 
