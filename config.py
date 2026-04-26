@@ -39,6 +39,9 @@ config = {
         "marker_length": 0.15,
         "reference_marker_id": 101,
     },
+    "pose_estimator": {
+        "log_points": True,
+    },
     "camera": { 
         "model": "phone", # just for testing
         "device": "http://192.168.178.151:8080/video",  # IP Webcam URL

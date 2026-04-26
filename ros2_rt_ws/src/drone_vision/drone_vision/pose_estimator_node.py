@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fuse ArUco pose and YOLO detections into approximate world positions."""
 
+import csv
 import json
 import sys
 from pathlib import Path
@@ -8,11 +9,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 import rclpy
-from geometry_msgs.msg import PointStamped, Vector3
+from geometry_msgs.msg import Vector3
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
-from std_msgs.msg import Int32, String
+from std_msgs.msg import Int32
 import yaml
+from std_msgs.msg import String
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
 
@@ -60,8 +62,26 @@ class PoseEstimatorNode(Node):
         self.create_subscription(Int32, '/aruco/marker_id', self.marker_id_callback, 1)
         self.create_subscription(String, '/detections/raw', self.detections_callback, 1)
 
-        self.world_pub = self.create_publisher(PointStamped, '/detections_world', 1)
-        self.world_raw_pub = self.create_publisher(String, '/detections_world/raw', 1)
+        self.log_points = bool(config.get('pose_estimator', {}).get('log_points', False))
+
+        self.csv_path = self.base_dir / 'data' / 'detections' / 'ros_yolo' / 'detections.csv'
+        self.csv_columns = [
+            'timestamp',
+            'class_name',
+            'confidence',
+            'x1',
+            'y1',
+            'x2',
+            'y2',
+            'center_x',
+            'center_y',
+            'drone_x',
+            'drone_y',
+            'world_x',
+            'world_y',
+            'image_path',
+        ]
+        self._ensure_csv_header()
 
         self.get_logger().info(
             f'Pose estimator ready. target_classes={sorted(self.target_classes) if self.target_classes else "all"}, reference_marker_id={self.reference_marker_id}'
@@ -95,40 +115,53 @@ class PoseEstimatorNode(Node):
         if not detections:
             return
 
-        detections_world = []
+        stamp = payload.get('stamp', {})
+        ts_sec = int(stamp.get('sec', 0))
+        ts_nanosec = int(stamp.get('nanosec', 0))
+        timestamp = ts_sec + (ts_nanosec * 1e-9)
+
         for detection in detections:
             class_name = detection.get('class_name', '')
             if self.target_classes and class_name not in self.target_classes:
                 continue
 
-            world_point = self._estimate_world_point(detection)
-            if world_point is None:
+            estimated_points = self._estimate_points(detection)
+            if estimated_points is None:
                 continue
+            drone_point, world_point = estimated_points
 
-            # Publish the point for simple ROS visualization.
-            out_msg = PointStamped()
-            out_msg.header.stamp = self.get_clock().now().to_msg()
-            out_msg.header.frame_id = 'world'
-            out_msg.point.x = float(world_point[0])
-            out_msg.point.y = float(world_point[1])
-            out_msg.point.z = float(world_point[2])
-            self.world_pub.publish(out_msg)
+            if self.log_points:
+                self.get_logger().info(
+                    f'{class_name}: drone=({drone_point[0]:.3f}, {drone_point[1]:.3f}) world=({world_point[0]:.3f}, {world_point[1]:.3f})'
+                )
 
-            detections_world.append(
+            bbox = detection.get('bbox', [None, None, None, None])
+            if len(bbox) < 4:
+                bbox = [None, None, None, None]
+            center = detection.get('center', [None, None])
+            if len(center) < 2:
+                center = [None, None]
+
+            self._append_csv_row(
                 {
+                    'timestamp': f'{timestamp:.6f}',
                     'class_name': class_name,
-                    'confidence': float(detection.get('confidence', 0.0)),
+                    'confidence': f"{float(detection.get('confidence', 0.0)):.4f}",
+                    'x1': self._fmt_float(bbox[0]),
+                    'y1': self._fmt_float(bbox[1]),
+                    'x2': self._fmt_float(bbox[2]),
+                    'y2': self._fmt_float(bbox[3]),
+                    'center_x': self._fmt_float(center[0]),
+                    'center_y': self._fmt_float(center[1]),
+                    'drone_x': f'{float(drone_point[0]):.4f}',
+                    'drone_y': f'{float(drone_point[1]):.4f}',
+                    'world_x': f'{float(world_point[0]):.4f}',
+                    'world_y': f'{float(world_point[1]):.4f}',
                     'image_path': detection.get('image_path', ''),
-                    'world': [float(world_point[0]), float(world_point[1]), float(world_point[2])],
                 }
             )
 
-        if detections_world:
-            raw_msg = String()
-            raw_msg.data = json.dumps({'detections_world': detections_world})
-            self.world_raw_pub.publish(raw_msg)
-
-    def _estimate_world_point(self, detection):
+    def _estimate_points(self, detection):
         # 2) Require the minimum data needed for geometry.
         if self.camera_matrix is None or self.dist_coeffs is None:
             return None
@@ -148,12 +181,6 @@ class PoseEstimatorNode(Node):
         transform_world_marker[:3, 3] = marker_world
         transform_world_camera = transform_world_marker @ np.linalg.inv(transform_camera_marker)
 
-        # 4) Pick the 2D pixel center from detection bbox.
-        fx = self.camera_matrix[0, 0]
-        fy = self.camera_matrix[1, 1]
-        cx = self.camera_matrix[0, 2]
-        cy = self.camera_matrix[1, 2]
-
         center = detection.get('center', None)
         if center is None:
             bbox = detection.get('bbox', None)
@@ -164,7 +191,12 @@ class PoseEstimatorNode(Node):
         else:
             u, v = float(center[0]), float(center[1])
 
-        # 5) Undistort pixel and convert to a normalized camera ray.
+        # 4) Undistort pixel and convert to a normalized camera ray.
+        fx = self.camera_matrix[0, 0]
+        fy = self.camera_matrix[1, 1]
+        cx = self.camera_matrix[0, 2]
+        cy = self.camera_matrix[1, 2]
+
         pixel = np.array([[[u, v]]], dtype=np.float64)
         undistorted = cv2.undistortPoints(pixel, self.camera_matrix, self.dist_coeffs, P=self.camera_matrix)
         u_corr = float(undistorted[0, 0, 0])
@@ -173,19 +205,57 @@ class PoseEstimatorNode(Node):
         ray_camera = np.array([(u_corr - cx) / fx, (v_corr - cy) / fy, 1.0], dtype=np.float64)
         ray_camera /= np.linalg.norm(ray_camera)
 
-        # 6) Transform ray from camera frame to world frame.
-        rotation_world_camera = transform_world_camera[:3, :3]
-        origin_world = transform_world_camera[:3, 3]
-        ray_world = rotation_world_camera @ ray_camera
-
-        # 7) Intersect world ray with ground plane z = marker_world_z.
-        plane_z = float(marker_world[2])
-        if abs(ray_world[2]) < 1e-8:
+        # 5) Intersect camera ray with the marker plane in camera frame.
+        plane_point_camera = marker_translation
+        plane_normal_camera = marker_rotation[:, 2]
+        denom = float(np.dot(plane_normal_camera, ray_camera))
+        if abs(denom) < 1e-8:
             return None
 
-        scale = (plane_z - origin_world[2]) / ray_world[2]
-        world_point = origin_world + scale * ray_world
-        return world_point
+        scale_camera = float(np.dot(plane_normal_camera, plane_point_camera) / denom)
+        if scale_camera <= 0.0:
+            return None
+
+        drone_point = scale_camera * ray_camera
+
+        # 6) Transform the camera-frame point to world frame.
+        rotation_world_camera = transform_world_camera[:3, :3]
+        origin_world = transform_world_camera[:3, 3]
+        world_point = origin_world + (rotation_world_camera @ drone_point)
+        return drone_point, world_point
+
+    def _fmt_float(self, value):
+        if value is None:
+            return ''
+        return f'{float(value):.2f}'
+
+    def _ensure_csv_header(self):
+        self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.csv_path.exists():
+            with self.csv_path.open('w', newline='', encoding='utf-8') as handle:
+                writer = csv.DictWriter(handle, fieldnames=self.csv_columns)
+                writer.writeheader()
+            return
+
+        with self.csv_path.open('r', newline='', encoding='utf-8') as handle:
+            reader = csv.DictReader(handle)
+            existing_columns = reader.fieldnames or []
+            rows = list(reader)
+
+        if existing_columns == self.csv_columns:
+            return
+
+        with self.csv_path.open('w', newline='', encoding='utf-8') as handle:
+            writer = csv.DictWriter(handle, fieldnames=self.csv_columns)
+            writer.writeheader()
+            for row in rows:
+                migrated = {column: row.get(column, '') for column in self.csv_columns}
+                writer.writerow(migrated)
+
+    def _append_csv_row(self, row):
+        with self.csv_path.open('a', newline='', encoding='utf-8') as handle:
+            writer = csv.DictWriter(handle, fieldnames=self.csv_columns)
+            writer.writerow(row)
 
 
 def main(args=None):

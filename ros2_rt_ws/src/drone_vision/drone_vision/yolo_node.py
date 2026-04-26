@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """YOLO detection node - subscribes to camera, detects objects, publishes detections."""
 
-import csv
 import json
 from pathlib import Path
 import sys
@@ -42,6 +41,10 @@ class YOLONode(Node):
         self.confidence = confidence
         self.device = device
         self.imgsz = imgsz
+        self.track_distance_px = float(yolo_cfg.get('track_distance_px', 80.0))
+        self.track_timeout_s = float(yolo_cfg.get('track_timeout_s', 1.5))
+        self.next_track_id = 1
+        self.active_tracks = []
 
         self.class_ids = None
         if desired_classes:
@@ -61,22 +64,6 @@ class YOLONode(Node):
         # Simple photo logging for report generation.
         self.photo_dir = base_dir / 'data' / 'detections' / 'ros_yolo' / 'images'
         self.photo_dir.mkdir(parents=True, exist_ok=True)
-        self.csv_path = base_dir / 'data' / 'detections' / 'ros_yolo' / 'detections.csv'
-        if not self.csv_path.exists():
-            with self.csv_path.open('w', newline='', encoding='utf-8') as handle:
-                writer = csv.writer(handle)
-                writer.writerow([
-                    'timestamp',
-                    'class_name',
-                    'confidence',
-                    'x1',
-                    'y1',
-                    'x2',
-                    'y2',
-                    'center_x',
-                    'center_y',
-                    'image_path',
-                ])
         
         self.get_logger().info(
             f"YOLO ready. Confidence: {confidence}, Device: {device}, imgsz: {imgsz}, classes: {self.class_ids}"
@@ -111,42 +98,42 @@ class YOLONode(Node):
             class_name = str(self.model.names.get(class_id, class_id))
             x1, y1, x2, y2 = [float(value) for value in box.xyxy[0].tolist()]
             confidence = float(box.conf[0].item())
+            center_x = 0.5 * (x1 + x2)
+            center_y = 0.5 * (y1 + y2)
 
-            # Save one cropped image per detection event.
-            pad_x = int(0.08 * (x2 - x1))
-            pad_y = int(0.08 * (y2 - y1))
-            h, w = frame.shape[:2]
-            left = max(0, int(x1) - pad_x)
-            top = max(0, int(y1) - pad_y)
-            right = min(w, int(x2) + pad_x)
-            bottom = min(h, int(y2) + pad_y)
-            crop = frame[top:bottom, left:right]
-
+            # Save one full-frame image per tracked probe instead of one crop per frame.
+            self._prune_stale_tracks(now)
+            track = self._match_track(class_name, center_x, center_y, now)
             image_path = ''
-            if crop.size > 0:
+            if track is not None and track['image_path']:
+                image_path = track['image_path']
+            else:
                 ts = time.strftime('%Y-%m-%dT%H-%M-%S', time.localtime(now))
                 suffix = int((now - int(now)) * 1000)
-                image_name = f'{ts}_{suffix:03d}_{class_name}_{confidence:.2f}.jpg'
+                track_id = track['id'] if track is not None else self.next_track_id
+                image_name = f'{ts}_{suffix:03d}_{class_name}_track{track_id:03d}_{confidence:.2f}.jpg'
                 full_path = self.photo_dir / image_name
-                cv2.imwrite(str(full_path), crop)
+                cv2.imwrite(str(full_path), frame)
                 image_path = str(full_path)
 
-                center_x = 0.5 * (x1 + x2)
-                center_y = 0.5 * (y1 + y2)
-                with self.csv_path.open('a', newline='', encoding='utf-8') as handle:
-                    writer = csv.writer(handle)
-                    writer.writerow([
-                        f'{now:.6f}',
-                        class_name,
-                        f'{confidence:.4f}',
-                        f'{x1:.2f}',
-                        f'{y1:.2f}',
-                        f'{x2:.2f}',
-                        f'{y2:.2f}',
-                        f'{center_x:.2f}',
-                        f'{center_y:.2f}',
-                        image_path,
-                    ])
+                if track is None:
+                    track = {
+                        'id': int(self.next_track_id),
+                        'class_name': class_name,
+                        'center_x': float(center_x),
+                        'center_y': float(center_y),
+                        'last_seen': float(now),
+                        'image_path': image_path,
+                    }
+                    self.active_tracks.append(track)
+                    self.next_track_id += 1
+                else:
+                    track['image_path'] = image_path
+
+            if track is not None:
+                track['center_x'] = float(center_x)
+                track['center_y'] = float(center_y)
+                track['last_seen'] = float(now)
 
             detections.append(
                 {
@@ -175,6 +162,27 @@ class YOLONode(Node):
         # Log detections
         if len(results[0].boxes) > 0:
             self.get_logger().info(f"Detected {len(results[0].boxes)} objects")
+
+    def _prune_stale_tracks(self, now: float):
+        self.active_tracks = [
+            track for track in self.active_tracks if now - track['last_seen'] <= self.track_timeout_s
+        ]
+
+    def _match_track(self, class_name: str, center_x: float, center_y: float, now: float):
+        best_track = None
+        best_distance_sq = self.track_distance_px * self.track_distance_px
+        for track in self.active_tracks:
+            if track['class_name'] != class_name:
+                continue
+            if now - track['last_seen'] > self.track_timeout_s:
+                continue
+            dx = track['center_x'] - center_x
+            dy = track['center_y'] - center_y
+            distance_sq = dx * dx + dy * dy
+            if distance_sq <= best_distance_sq:
+                best_distance_sq = distance_sq
+                best_track = track
+        return best_track
 
 
 def main(args=None):
