@@ -16,10 +16,22 @@ from std_msgs.msg import Int32
 import yaml
 from std_msgs.msg import String
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
+# To use config.py
+import os
+import importlib.util
+from ament_index_python.packages import get_package_share_directory
 
-from config import config
+# Get the path to the share directory
+package_share_dir = get_package_share_directory('drone_vision')
+config_path = os.path.join(package_share_dir, 'config.py')
 
+# Import the module dynamically
+spec = importlib.util.spec_from_file_location("config", config_path)
+config_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(config_module)
+
+# Now use it!
+config = config_module.config
 
 def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:
     transform = np.eye(4, dtype=np.float64)

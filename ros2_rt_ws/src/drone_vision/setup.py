@@ -1,14 +1,19 @@
 from setuptools import find_packages, setup
+import os
+
+package_name='drone_vision'
+config_file_source = os.path.join('../../..', 'config.py')
 
 setup(
-    name='drone_vision',
+    name=package_name,
     version='0.1.0',
     packages=find_packages(),
     install_requires=['setuptools'],
     data_files=[
-        ('share/ament_index/resource_index/packages', ['resource/drone_vision']),
-        ('share/drone_vision', ['package.xml']),
+        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
         ('share/drone_vision/launch', ['launch/drone_vision.launch.py']),
+        (os.path.join('share', package_name), [config_file_source])
     ],
     entry_points={
         'console_scripts': [

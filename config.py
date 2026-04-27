@@ -1,6 +1,6 @@
 from pathlib import Path
 
-base_dir = Path(__file__).resolve().parent
+base_dir = Path(__file__).resolve().parents[5]
 data_dir = base_dir / "data"
 
 config = {

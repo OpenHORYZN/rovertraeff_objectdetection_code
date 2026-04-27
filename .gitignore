@@ -1,1 +1,4 @@
 proj_env/
+build/
+install/
+log/
