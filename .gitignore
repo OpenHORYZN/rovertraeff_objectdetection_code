@@ -2,3 +2,4 @@ proj_env/
 build/
 install/
 log/
+data/raw/flighttest1/
