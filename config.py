@@ -8,7 +8,7 @@ config = {
         "base": base_dir,
         "data": data_dir,
         "raw": data_dir / "raw" ,                     
-        "ls_export": data_dir / "labeled" / "Resultslabeling" / "LSTest" / "test2-norotation-probeonly.json",
+        "ls_export": data_dir / "labeled" / "Resultslabeling" / "LSFlighttest1_YoloOBBImag" / "project-3-at-2026-04-30-14-22-7fea1c75.json",
         "yolo_root": data_dir / "yolo",
         "images": data_dir / "yolo" / "images",
         "labels": data_dir / "yolo" / "labels",
