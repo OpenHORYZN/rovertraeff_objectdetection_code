@@ -12,6 +12,7 @@ from config import config
 IOU_THRESH = config["validation"]["iou_threshold"]
 CONF_THRESH = config["validation"]["conf_threshold"]
 
+
 COLORS = {
     "gt": (0, 255, 255),   # yellow in BGR
     "tp": (0, 255, 0),     # green
@@ -94,7 +95,7 @@ def draw_box(img, box, color, label):
 
 
 def get_best_weights():
-    weights = config["paths"]["runs"] / "probe_yolo11_train" / "weights" / "best.pt"
+    weights = config["paths"]["runs"] / "FT1TVT1_yolo11s_train_b25" / "weights" / "best.pt"
     return weights
 
 
@@ -105,8 +106,9 @@ def test_and_visualize():
     weights = get_best_weights()
     model = YOLO(str(weights))
 
-    test_img_dir = paths["images"] / "test"
-    test_lbl_dir = paths["labels"] / "test"
+    test_root = paths["yolo_root"] / "test"
+    test_img_dir = test_root / "images"
+    test_lbl_dir = test_root / "labels"
     vis_dir = paths["vis"]
 
     image_paths = sorted([
