@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Aruco node - detects markers and publishes marker id + rvec/tvec + annotated image."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -9,10 +10,9 @@ import cv2
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
-from geometry_msgs.msg import Vector3
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
-from std_msgs.msg import Int32
+from std_msgs.msg import String
 
 # To use config.py
 import os
@@ -51,9 +51,7 @@ class ArucoNode(Node):
         self.info_sub = self.create_subscription(CameraInfo, '/camera/color/camera_info', self.info_callback, 1)
 
         self.annotated_pub = self.create_publisher(Image, '/aruco/annotated', 1)
-        self.rvec_pub = self.create_publisher(Vector3, '/aruco/rvec', 1)
-        self.tvec_pub = self.create_publisher(Vector3, '/aruco/tvec', 1)
-        self.marker_id_pub = self.create_publisher(Int32, '/aruco/marker_id', 1)
+        self.markers_pub = self.create_publisher(String, '/aruco/markers', 1)
 
         self.bridge = CvBridge()
         self.get_logger().info(
@@ -72,55 +70,63 @@ class ArucoNode(Node):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detector.detectMarkers(gray)
 
+        markers_out = []
+
         if ids is None or len(ids) == 0:
+            self.markers_pub.publish(String(data=json.dumps(markers_out)))
             self.annotated_pub.publish(self.bridge.cv2_to_imgmsg(frame, encoding='bgr8'))
             return
 
         frame = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
 
         if self.camera_matrix is not None and self.dist_coeffs is not None:
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-                corners,
-                self.marker_length,
-                self.camera_matrix,
-                self.dist_coeffs,
-            )
+            # For compatibility across OpenCV versions, use solvePnP per marker
+            for i, m in enumerate(ids.flatten()):
+                corner = corners[i][0]
+                obj_points = np.array([
+                    [-self.marker_length / 2, self.marker_length / 2, 0],
+                    [self.marker_length / 2, self.marker_length / 2, 0],
+                    [self.marker_length / 2, -self.marker_length / 2, 0],
+                    [-self.marker_length / 2, -self.marker_length / 2, 0]
+                ], dtype=np.float32)
+                try:
+                    success, rvec, tvec = cv2.solvePnP(
+                        obj_points,
+                        corner.astype(np.float32),
+                        self.camera_matrix,
+                        self.dist_coeffs,
+                        flags=cv2.SOLVEPNP_IPPE_SQUARE,
+                    )
+                except Exception:
+                    success = False
 
-            first_id = int(ids[0][0])
-            first_rvec = rvecs[0][0]
-            first_tvec = tvecs[0][0]
+                if success:
+                    if i == 0:
+                        try:
+                            cv2.drawFrameAxes(
+                                frame,
+                                self.camera_matrix,
+                                self.dist_coeffs,
+                                rvec.flatten(),
+                                tvec.flatten(),
+                                self.marker_length * 0.5,
+                            )
+                        except cv2.error:
+                            pass
 
-            try:
-                cv2.drawFrameAxes(
-                    frame,
-                    self.camera_matrix,
-                    self.dist_coeffs,
-                    first_rvec,
-                    first_tvec,
-                    self.marker_length * 0.5,
-                )
-            except cv2.error:
-                pass
+                        self.get_logger().info(
+                            f'Detected marker {int(m)} tvec=({tvec[0][0]:.2f}, {tvec[1][0]:.2f}, {tvec[2][0]:.2f})'
+                        )
 
-            rvec_msg = Vector3()
-            rvec_msg.x = float(first_rvec[0])
-            rvec_msg.y = float(first_rvec[1])
-            rvec_msg.z = float(first_rvec[2])
-            self.rvec_pub.publish(rvec_msg)
+                    markers_out.append({
+                        'id': int(m),
+                        'rvec': rvec.flatten().tolist(),
+                        'tvec': tvec.flatten().tolist(),
+                        'corners': corner.tolist(),
+                    })
 
-            tvec_msg = Vector3()
-            tvec_msg.x = float(first_tvec[0])
-            tvec_msg.y = float(first_tvec[1])
-            tvec_msg.z = float(first_tvec[2])
-            self.tvec_pub.publish(tvec_msg)
-
-            marker_id_msg = Int32()
-            marker_id_msg.data = first_id
-            self.marker_id_pub.publish(marker_id_msg)
-
-            self.get_logger().info(
-                f'Detected marker {first_id} tvec=({first_tvec[0]:.2f}, {first_tvec[1]:.2f}, {first_tvec[2]:.2f})'
-            )
+        # Publish all detected marker data as JSON on /aruco/markers
+        self.markers_pub.publish(String(data=json.dumps(markers_out)))
 
         self.annotated_pub.publish(self.bridge.cv2_to_imgmsg(frame, encoding='bgr8'))
 

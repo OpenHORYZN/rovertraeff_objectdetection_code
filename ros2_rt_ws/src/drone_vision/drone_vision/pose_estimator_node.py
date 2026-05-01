@@ -9,10 +9,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 import rclpy
-from geometry_msgs.msg import Vector3
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
-from std_msgs.msg import Int32
 import yaml
 from std_msgs.msg import String
 
@@ -47,8 +45,8 @@ class PoseEstimatorNode(Node):
         self.yolo_cfg = config['yolo']
         configured_classes = self.yolo_cfg.get('classes') or []
         self.target_classes = set(configured_classes)
-        self.reference_marker_id = int(config.get('aruco', {}).get('reference_marker_id', 101))
         self.base_dir = Path(config['paths']['base'])
+        self.marker_length = float(config.get('aruco', {}).get('marker_length', 0.15))
 
         aruco_path = self.base_dir / 'positioning' / 'aruco_pos.yaml'
         with open(aruco_path, 'r', encoding='utf-8') as handle:
@@ -64,14 +62,10 @@ class PoseEstimatorNode(Node):
 
         self.camera_matrix = None
         self.dist_coeffs = None
-        self.latest_rvec = None
-        self.latest_tvec = None
-        self.latest_marker_id = None
+        self.latest_markers = {}  # id -> {'rvec': [..], 'tvec': [..], 'corners': [[x,y],...]}
 
         self.create_subscription(CameraInfo, '/camera/color/camera_info', self.camera_info_callback, 1)
-        self.create_subscription(Vector3, '/aruco/rvec', self.rvec_callback, 1)
-        self.create_subscription(Vector3, '/aruco/tvec', self.tvec_callback, 1)
-        self.create_subscription(Int32, '/aruco/marker_id', self.marker_id_callback, 1)
+        self.create_subscription(String, '/aruco/markers', self.aruco_markers_callback, 1)
         self.create_subscription(String, '/detections/raw', self.detections_callback, 1)
 
         self.log_points = bool(config.get('pose_estimator', {}).get('log_points', False))
@@ -96,7 +90,7 @@ class PoseEstimatorNode(Node):
         self._ensure_csv_header()
 
         self.get_logger().info(
-            f'Pose estimator ready. target_classes={sorted(self.target_classes) if self.target_classes else "all"}, reference_marker_id={self.reference_marker_id}'
+            f'Pose estimator ready. target_classes={sorted(self.target_classes) if self.target_classes else "all"}, multi-marker world estimation enabled'
         )
 
     def camera_info_callback(self, msg: CameraInfo):
@@ -106,14 +100,27 @@ class PoseEstimatorNode(Node):
         else:
             self.dist_coeffs = np.zeros(5, dtype=np.float64)
 
-    def rvec_callback(self, msg: Vector3):
-        self.latest_rvec = np.array([msg.x, msg.y, msg.z], dtype=np.float64)
+    def aruco_markers_callback(self, msg: String):
+        """Receive JSON list of visible markers published by aruco_node.
 
-    def tvec_callback(self, msg: Vector3):
-        self.latest_tvec = np.array([msg.x, msg.y, msg.z], dtype=np.float64)
-
-    def marker_id_callback(self, msg: Int32):
-        self.latest_marker_id = int(msg.data)
+        Expected format: [{"id": int, "rvec": [x,y,z], "tvec": [x,y,z], "corners": [[x,y],...]}, ...]
+        """
+        try:
+            data = json.loads(msg.data)
+        except Exception:
+            return
+        new = {}
+        for m in data:
+            try:
+                mid = int(m.get('id'))
+                new[mid] = {
+                    'rvec': np.array(m.get('rvec', []), dtype=np.float64),
+                    'tvec': np.array(m.get('tvec', []), dtype=np.float64),
+                    'corners': np.array(m.get('corners', []), dtype=np.float32),
+                }
+            except Exception:
+                continue
+        self.latest_markers = new
 
     def detections_callback(self, msg: String):
         # 1) Parse incoming YOLO detections.
@@ -174,25 +181,52 @@ class PoseEstimatorNode(Node):
             )
 
     def _estimate_points(self, detection):
-        # 2) Require the minimum data needed for geometry.
+        # 2) Require camera intrinsics.
         if self.camera_matrix is None or self.dist_coeffs is None:
             return None
-        if self.latest_rvec is None or self.latest_tvec is None or self.latest_marker_id is None:
+
+        if not self.latest_markers:
             return None
 
-        marker_world = self.marker_world_positions.get(self.latest_marker_id)
-        if marker_world is None:
+        # Build 3D-2D correspondences from all visible markers
+        obj_pts_list = []
+        img_pts_list = []
+        for mid, data in self.latest_markers.items():
+            corners = data.get('corners')
+            if corners is None or len(corners) < 4:
+                continue
+            mw = self.marker_world_positions.get(int(mid))
+            if mw is None:
+                continue
+            offsets = np.array([
+                [-0.5 * self.marker_length,  0.5 * self.marker_length, 0.0],
+                [ 0.5 * self.marker_length,  0.5 * self.marker_length, 0.0],
+                [ 0.5 * self.marker_length, -0.5 * self.marker_length, 0.0],
+                [-0.5 * self.marker_length, -0.5 * self.marker_length, 0.0],
+            ], dtype=np.float64)
+            obj = (mw.reshape(1, 3) + offsets).astype(np.float32)
+            obj_pts_list.append(obj)
+            img_pts_list.append(np.array(corners, dtype=np.float32))
+
+        if len(obj_pts_list) == 0:
+            return None
+        obj_pts = np.vstack(obj_pts_list)
+        img_pts = np.vstack(img_pts_list)
+        if obj_pts.shape[0] < 4:
             return None
 
-        # 3) Build camera->marker and world->camera transforms from rvec/tvec + known marker world position.
-        marker_rotation, _ = cv2.Rodrigues(self.latest_rvec)
-        marker_translation = self.latest_tvec
+        try:
+            success, rvec, tvec, inliers = cv2.solvePnPRansac(obj_pts, img_pts, self.camera_matrix, self.dist_coeffs)
+        except Exception:
+            return None
+        if not success:
+            return None
 
-        transform_camera_marker = make_transform(marker_rotation, marker_translation)
-        transform_world_marker = np.eye(4, dtype=np.float64)
-        transform_world_marker[:3, 3] = marker_world
-        transform_world_camera = transform_world_marker @ np.linalg.inv(transform_camera_marker)
+        rot_cam_world, _ = cv2.Rodrigues(rvec)
+        transform_camera_world = make_transform(rot_cam_world, tvec.flatten())
+        transform_world_camera = np.linalg.inv(transform_camera_world)
 
+        # detection center
         center = detection.get('center', None)
         if center is None:
             bbox = detection.get('bbox', None)
@@ -203,37 +237,21 @@ class PoseEstimatorNode(Node):
         else:
             u, v = float(center[0]), float(center[1])
 
-        # 4) Undistort pixel and convert to a normalized camera ray.
-        fx = self.camera_matrix[0, 0]
-        fy = self.camera_matrix[1, 1]
-        cx = self.camera_matrix[0, 2]
-        cy = self.camera_matrix[1, 2]
+        fx = self.camera_matrix[0, 0]; fy = self.camera_matrix[1, 1]; cx = self.camera_matrix[0, 2]; cy = self.camera_matrix[1, 2]
+        d_cam = np.array([ (u - cx) / fx, (v - cy) / fy, 1.0 ], dtype=np.float64)
 
-        pixel = np.array([[[u, v]]], dtype=np.float64)
-        undistorted = cv2.undistortPoints(pixel, self.camera_matrix, self.dist_coeffs, P=self.camera_matrix)
-        u_corr = float(undistorted[0, 0, 0])
-        v_corr = float(undistorted[0, 0, 1])
-
-        ray_camera = np.array([(u_corr - cx) / fx, (v_corr - cy) / fy, 1.0], dtype=np.float64)
-        ray_camera /= np.linalg.norm(ray_camera)
-
-        # 5) Intersect camera ray with the marker plane in camera frame.
-        plane_point_camera = marker_translation
-        plane_normal_camera = marker_rotation[:, 2]
-        denom = float(np.dot(plane_normal_camera, ray_camera))
+        R_world_cam = transform_world_camera[:3, :3]
+        T_world_cam = transform_world_camera[:3, 3]
+        plane_z = float(np.mean([self.marker_world_positions[int(mid)][2] for mid in self.latest_markers.keys() if int(mid) in self.marker_world_positions]))
+        denom = float(R_world_cam[2, :].dot(d_cam))
         if abs(denom) < 1e-8:
             return None
-
-        scale_camera = float(np.dot(plane_normal_camera, plane_point_camera) / denom)
-        if scale_camera <= 0.0:
+        s = (plane_z - float(T_world_cam[2])) / denom
+        if s <= 0.0:
             return None
-
-        drone_point = scale_camera * ray_camera
-
-        # 6) Transform the camera-frame point to world frame.
-        rotation_world_camera = transform_world_camera[:3, :3]
-        origin_world = transform_world_camera[:3, 3]
-        world_point = origin_world + (rotation_world_camera @ drone_point)
+        cam_point = s * d_cam
+        world_point = R_world_cam.dot(cam_point) + T_world_cam
+        drone_point = T_world_cam
         return drone_point, world_point
 
     def _fmt_float(self, value):
