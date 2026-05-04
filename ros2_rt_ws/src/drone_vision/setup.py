@@ -3,6 +3,8 @@ import os
 
 package_name='drone_vision'
 config_file_source = os.path.join('../../..', 'config.py')
+weights_file_source = os.path.join('../../..', 'data/runs/FT1TVT1_yolo11_train/weights/best.pt')
+marker_positions_source = os.path.join('../../..', 'positioning/aruco_pos.yaml')
 
 setup(
     name=package_name,
@@ -12,8 +14,10 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/drone_vision/launch', ['launch/drone_vision.launch.py']),
-        (os.path.join('share', package_name), [config_file_source])
+        ('share/' + package_name + '/launch', ['launch/drone_vision.launch.py']),
+        ('share/' + package_name + '/launch', [config_file_source]),
+        ('share/' + package_name + '/data/runs/FT1TVT1_yolo11_train/weights/', [weights_file_source]),
+        ('share/' + package_name + '/positioning/', [marker_positions_source])
     ],
     entry_points={
         'console_scripts': [
