@@ -64,9 +64,12 @@ class YOLONode(Node):
             mapped_ids = [name_to_id[name] for name in desired_classes if name in name_to_id]
             if mapped_ids:
                 self.class_ids = mapped_ids
+            self.get_logger().info(f"Model classes: {name_to_id}")
+            self.get_logger().info(f"Desired classes: {desired_classes}")
+            self.get_logger().info(f"Class IDs: {mapped_ids}")
         
         # Subscribe to camera frames
-        self.sub = self.create_subscription(Image, '/camera/color/image_raw', self.detect, 1)
+        self.sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.detect, 1)
         self.bridge = CvBridge()
         
         # Publisher for annotated images (optional)
