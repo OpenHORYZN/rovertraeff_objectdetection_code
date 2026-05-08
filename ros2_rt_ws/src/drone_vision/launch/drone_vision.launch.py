@@ -4,12 +4,14 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     return LaunchDescription([
-        Node(
-            package='drone_vision',
-            executable='camera_node',
-            name='camera_node',
-            output='screen',
-        ),
+        # Not needed with D455 realsense camera,
+        # which already has a camera topic
+        # Node(
+        #     package='drone_vision',
+        #     executable='camera_node',
+        #     name='camera_node',
+        #     output='screen',
+        # ),
         Node(
             package='drone_vision',
             executable='yolo_node',
