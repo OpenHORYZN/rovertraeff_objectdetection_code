@@ -12,15 +12,18 @@ Usage:
 
 import csv
 import json
-import sys
-from pathlib import Path
 
 import cv2
 import numpy as np
 import yaml
 from ultralytics import YOLO
 
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # one folder above
 from config import config
+
 
 
 def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:

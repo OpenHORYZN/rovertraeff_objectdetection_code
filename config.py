@@ -23,20 +23,20 @@ config = {
         "seed": 42,
     },
     "yolo": {
-        "model": "yolo11n.pt",  # yolo11s.pt
+        "model": "yolo11n.pt",  # yolo11s.pt - too big and therefore too slow
         "modellive": "data/runs/FT1TVT1_yolo11_train/weights/best.pt",
         "device": "cpu",
         "epochs": 25,
         "batch": 4,
         "imgsz": 960, # phone: 640, d455: 960   
-        "classes": ["probe", "rako"], # "probe", "rako_big", "rako_small", testing: mouse
+        "classes": ["probes", "rako"], # "probe", "rako_big", "rako_small", testing: mouse
         "confidence": 0.2,    # Detection confidence threshold, live: 0.20
     },
     "aruco": {
         "enabled": True,
         "dictionary": "DICT_5X5_250", # 250?
         "fallback_dictionaries": ["DICT_5X5_50", "DICT_5X5_100", "DICT_5X5_250", "DICT_5X5_1000"],
-        "marker_length": 0.15,
+        "marker_length": 0.10,
         "reference_marker_id": 101,
     },
     "pose_estimator": {

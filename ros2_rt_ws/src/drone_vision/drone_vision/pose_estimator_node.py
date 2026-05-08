@@ -28,7 +28,6 @@ spec = importlib.util.spec_from_file_location("config", config_path)
 config_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config_module)
 
-# Now use it!
 config = config_module.config
 
 def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:
@@ -36,7 +35,6 @@ def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.n
     transform[:3, :3] = rotation_matrix
     transform[:3, 3] = translation
     return transform
-
 
 class PoseEstimatorNode(Node):
     def __init__(self):
