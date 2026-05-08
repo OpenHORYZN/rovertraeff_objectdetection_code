@@ -13,6 +13,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 import yaml
 from std_msgs.msg import String
+from geometry_msgs.msg import Pose, PoseArray
 
 # To use config.py
 import os
@@ -28,7 +29,6 @@ spec = importlib.util.spec_from_file_location("config", config_path)
 config_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config_module)
 
-# Now use it!
 config = config_module.config
 
 def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:
@@ -36,7 +36,6 @@ def make_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.n
     transform[:3, :3] = rotation_matrix
     transform[:3, 3] = translation
     return transform
-
 
 class PoseEstimatorNode(Node):
     def __init__(self):
@@ -64,9 +63,18 @@ class PoseEstimatorNode(Node):
         self.dist_coeffs = None
         self.latest_markers = {}  # id -> {'rvec': [..], 'tvec': [..], 'corners': [[x,y],...]}
 
-        self.create_subscription(CameraInfo, '/camera/color/camera_info', self.camera_info_callback, 1)
+        self.create_subscription(CameraInfo, '/camera/camera/color/camera_info', self.camera_info_callback, 1)
         self.create_subscription(String, '/aruco/markers', self.aruco_markers_callback, 1)
         self.create_subscription(String, '/detections/raw', self.detections_callback, 1)
+
+        self.box_pub = self.create_publisher(PoseArray, '/boxes', 1)
+        self.probe_pub = self.create_publisher(PoseArray, '/probes', 1)
+        self.timer = self.create_timer(0.5, self.timer_callback)
+
+        self.boxes = PoseArray()
+        self.probes = PoseArray()
+        self.boxes.header.frame_id = 'map'
+        self.probes.header.frame_id = 'map'
 
         self.log_points = bool(config.get('pose_estimator', {}).get('log_points', False))
 
@@ -142,10 +150,12 @@ class PoseEstimatorNode(Node):
         for detection in detections:
             class_name = detection.get('class_name', '')
             if self.target_classes and class_name not in self.target_classes:
+                self.get_logger().warn('Detected class not in target classes')
                 continue
 
             estimated_points = self._estimate_points(detection)
             if estimated_points is None:
+                self.get_logger().warn('Point estimation failed')
                 continue
             drone_point, world_point = estimated_points
 
@@ -180,12 +190,29 @@ class PoseEstimatorNode(Node):
                 }
             )
 
+            pose = Pose()
+            pose.position.x = center[0]
+            pose.position.y = center[1]
+            match class_name:
+                case 'rako':
+                    self.boxes.poses.append(pose)
+                    self.get_logger().info(f'Publishing box')
+                case 'probes':
+                    self.probes.poses.append(pose)
+                    self.get_logger().info(f'Publishing probe')
+
+    def timer_callback(self):
+        self.box_pub.publish(self.boxes)
+        self.probe_pub.publish(self.probes)
+
     def _estimate_points(self, detection):
         # 2) Require camera intrinsics.
         if self.camera_matrix is None or self.dist_coeffs is None:
+            self.get_logger().info(f'No intrinsics found')
             return None
 
         if not self.latest_markers:
+            self.get_logger().info(f'No arucos detected yet')
             return None
 
         # Build 3D-2D correspondences from all visible markers
@@ -194,9 +221,11 @@ class PoseEstimatorNode(Node):
         for mid, data in self.latest_markers.items():
             corners = data.get('corners')
             if corners is None or len(corners) < 4:
+                self.get_logger().info(f'Malformed aruco corners')
                 continue
-            mw = self.marker_world_positions.get(int(mid))
+            mw = self.marker_world_positions.get(int(mid)) # official position from yaml
             if mw is None:
+                self.get_logger().info(f'Failed to get aruco sensor positions')
                 continue
             offsets = np.array([
                 [-0.5 * self.marker_length,  0.5 * self.marker_length, 0.0],
@@ -209,6 +238,7 @@ class PoseEstimatorNode(Node):
             img_pts_list.append(np.array(corners, dtype=np.float32))
 
         if len(obj_pts_list) == 0:
+            self.get_logger().info(f'No arucos in current detection')
             return None
         obj_pts = np.vstack(obj_pts_list)
         img_pts = np.vstack(img_pts_list)
@@ -216,10 +246,12 @@ class PoseEstimatorNode(Node):
             return None
 
         try:
-            success, rvec, tvec, inliers = cv2.solvePnPRansac(obj_pts, img_pts, self.camera_matrix, self.dist_coeffs)
+            success, rvec, tvec, _ = cv2.solvePnPRansac(obj_pts, img_pts, self.camera_matrix, self.dist_coeffs)
         except Exception:
+            self.get_logger().info(f'Exception while calculating aruco positions')
             return None
         if not success:
+            self.get_logger().info(f'Exception while calculating aruco positions')
             return None
 
         rot_cam_world, _ = cv2.Rodrigues(rvec)
@@ -245,9 +277,11 @@ class PoseEstimatorNode(Node):
         plane_z = float(np.mean([self.marker_world_positions[int(mid)][2] for mid in self.latest_markers.keys() if int(mid) in self.marker_world_positions]))
         denom = float(R_world_cam[2, :].dot(d_cam))
         if abs(denom) < 1e-8:
+            self.get_logger().info(f'Numerical error (denominator too small)')
             return None
         s = (plane_z - float(T_world_cam[2])) / denom
         if s <= 0.0:
+            self.get_logger().info(f'Numerical error (s <= 0.0)')
             return None
         cam_point = s * d_cam
         world_point = R_world_cam.dot(cam_point) + T_world_cam
