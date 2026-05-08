@@ -47,7 +47,7 @@ class ArucoNode(Node):
         self.camera_matrix = None
         self.dist_coeffs = None
 
-        self.image_sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.image_callback, 1)
+        self.image_sub = self.create_subscription(Image, '/main_mission/aligned_image', self.image_callback, 1)
         self.info_sub = self.create_subscription(CameraInfo, '/camera/camera/color/camera_info', self.info_callback, 1)
 
         self.annotated_pub = self.create_publisher(Image, '/aruco/annotated', 1)
