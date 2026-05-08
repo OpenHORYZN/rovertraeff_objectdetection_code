@@ -29,7 +29,7 @@ config = {
         "epochs": 25,
         "batch": 4,
         "imgsz": 640, # phone: 640, d455: 960   
-        "classes": ["probess", "rako"], # "probes", "rako_big", "rako_small", testing: mouse
+        "classes": ["probes", "rako"], # "probes", "rako_big", "rako_small", testing: mouse
         "confidence": 0.5,    # Detection confidence threshold, live: 0.20
     },
     "aruco": {
