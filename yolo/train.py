@@ -23,7 +23,7 @@ def train():
         imgsz=yolo_cfg["imgsz"],
         device=yolo_cfg["device"],
         project=str(paths["runs"]),
-        name="FT1TVT1_yolo11s_train_b25",
+        name="FinalLabel_yolo11",
         exist_ok=True,
         pretrained=True,
         verbose=True,

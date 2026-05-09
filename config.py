@@ -9,12 +9,12 @@ config = {
         "data": data_dir,
         "raw": data_dir / "raw" ,                     
         "ls_export": data_dir / "labeled" / "Resultslabeling" / "LSFlighttest1_YoloOBBImag" / "project-3-at-2026-04-30-14-22-7fea1c75.json",
-        "yolo_root": data_dir / "labeled" / "Resultslabeling" / "RbflwFT1TVT",
+        "yolo_root": data_dir / "labeled" / "Resultslabeling" / "FinalLabel",
         "images": data_dir / "yolo" / "images",
         "labels": data_dir / "yolo" / "labels",
-        "data_yaml": data_dir / "labeled" / "Resultslabeling" / "RbflwFT1TVT" / "data.yaml",
+        "data_yaml": data_dir / "labeled" / "Resultslabeling" / "FinalLabel" / "data.yaml",
         "runs": data_dir / "runs",
-        "vis": data_dir / "labeled" / "Resultslabeling" / "RbflwFT1TVT" / "vis",
+        "vis": data_dir / "labeled" / "Resultslabeling" / "FinalLabel" / "vis",
     },
     "splits": {
         "train": 0.7,
@@ -24,11 +24,11 @@ config = {
     },
     "yolo": {
         "model": "yolo11n.pt",  # yolo11s.pt - too big and therefore too slow
-        "modellive": "data/runs/FT1TVT1_yolo11_train/weights/best.pt",
+        "modellive": "data/runs/FinalLabel_yolo11/weights/best.pt",
         "device": "cpu",
         "epochs": 25,
         "batch": 4,
-        "imgsz": 640, # phone: 640, d455: 960   
+        "imgsz": 960, # phone: 640, d455: 960   
         "classes": ["probes", "rako"], # "probes", "rako_big", "rako_small", testing: mouse
         "confidence": 0.5,    # Detection confidence threshold, live: 0.20
     },

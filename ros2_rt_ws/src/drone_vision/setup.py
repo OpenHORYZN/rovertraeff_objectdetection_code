@@ -14,7 +14,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/drone_vision.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/drone_vision.launch.py', 'launch/manual_labeler.launch.py']),
         ('share/' + package_name + '/', [config_file_source]),
         ('share/' + package_name + '/data/runs/FT1TVT1_yolo11_train/weights/', [weights_file_source]),
         ('share/' + package_name + '/positioning/', [marker_positions_source])
@@ -25,6 +25,7 @@ setup(
             'yolo_node = drone_vision.yolo_node:main',
             'aruco_node = drone_vision.aruco_node:main',
             'pose_estimator_node = drone_vision.pose_estimator_node:main',
+            'manual_labeler = drone_vision.manual_labeler:main',
         ],
     },
 )

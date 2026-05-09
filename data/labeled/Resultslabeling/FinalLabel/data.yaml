@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['probes', 'rako']
+
+roboflow:
+  workspace: connis-workspace-melcp
+  project: rovertraff2
+  version: 5
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/connis-workspace-melcp/rovertraff2/dataset/5
