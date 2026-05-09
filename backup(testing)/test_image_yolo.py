@@ -263,7 +263,7 @@ def main():
     if len(sys.argv) > 2:
         model_path = Path(sys.argv[2])
     else:
-        model_path = Path(__file__).parent / "data" / "runs" / "FT1TVT1_yolo11_train" / "weights" / "best.pt"
+        model_path = Path(__file__).parent / "data" / "runs" / "FinalLabel_yolo11" / "weights" / "best.pt"
     
     print(f"\nImage: {image_path}")
     print(f"Model: {model_path}")

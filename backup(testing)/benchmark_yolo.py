@@ -97,6 +97,7 @@ def main():
     model_specs = [
         ("yolo11n", config["paths"]["runs"] / "FT1TVT1_yolo11_train" / "weights" / "best.pt"),
         ("yolo11s", config["paths"]["runs"] / "FT1TVT1_yolo11s_train_b25" / "weights" / "best.pt"),
+        ("yolo11s", config["paths"]["runs"] / "FinalLabel_yolo11" / "weights" / "best.pt"),
     ]
 
     image_paths = collect_test_images()

@@ -95,7 +95,7 @@ def draw_box(img, box, color, label):
 
 
 def get_best_weights():
-    weights = config["paths"]["runs"] / "FT1TVT1_yolo11s_train_b25" / "weights" / "best.pt"
+    weights = config["paths"]["runs"] / "FinalLabel_yolo11" / "weights" / "best.pt"
     return weights
 
 
