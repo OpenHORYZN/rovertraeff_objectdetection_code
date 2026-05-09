@@ -69,7 +69,7 @@ class YOLONode(Node):
             self.get_logger().info(f"Class IDs: {mapped_ids}")
         
         # Subscribe to camera frames
-        self.sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.detect, 1)
+        self.sub = self.create_subscription(Image, '/main_mission/aligned_image', self.detect, 1)
         self.bridge = CvBridge()
         
         # Publisher for annotated images (optional)
